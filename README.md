@@ -1,4 +1,4 @@
-# ZJU-blockchain-course-2025
+# ZJU-blockchain-course-2025-ymy
 
 ⬆ 可以️修改成你自己的项目名。
 
@@ -27,38 +27,140 @@
 
 补充如何完整运行你的应用。
 
-1. 在本地启动ganache应用。
+1. 确保你已经安装了以下软件：
 
-2. 在 `./contracts` 中安装需要的依赖，运行如下的命令：
+   - Node.js (推荐版本 16.x 或 18.x)
+   - npm 或 yarn 包管理器
+
+2. 首先需要启动一个本地的以太坊测试网络
     ```bash
+    # 进入合约目录
+    cd ZJU-blockchain-course-2025
+    cd contracts
+
+    # 安装合约依赖
     npm install
+
+    # 启动本地测试网络 (Hardhat Network)
+    npx hardhat node
     ```
-3. 在 `./contracts` 中编译合约，运行如下的命令：
+    这将启动一个本地的以太坊网络，通常在 http://127.0.0.1:8545 上运行。
+3. 在另一个终端窗口中，部署智能合约到本地网络
     ```bash
+    # 仍在 contracts 目录中
     npx hardhat compile
+
+    # 部署合约
+    npx hardhat run scripts/deploy.ts --network localhost
     ```
-4. ...
-5. ...
-6. 在 `./frontend` 中安装需要的依赖，运行如下的命令：
-    ```bash
+4. 部署完成后，记录下输出的合约地址，需要更新到前端配置中。
+   打开 frontend/src/utils/contracts.ts 文件，更新 CONTRACT_ADDRESSES 对象中的地址：
+    ```ts
+    const CONTRACT_ADDRESSES = {
+    lotteryToken: "这里填入LotteryToken合约地址",
+    lotteryTicket: "这里填入LotteryTicket合约地址",
+    lottery: "这里填入Lottery合约地址"
+    };
+    ```
+
+5. 启动前端应用
+   ```bash
+   # 进入前端目录
+    cd ../frontend
+
+    # 安装前端依赖
     npm install
-    ```
-7. 在 `./frontend` 中启动前端程序，运行如下的命令：
-    ```bash
+
+    # 启动前端应用
     npm run start
     ```
+
+
+6. 配置MetaMask钱包
+    - 打开浏览器中的MetaMask插件
+    - 添加本地网络：
+    网络名称：Hardhat Local
+    RPC URL：http://127.0.0.1:8545
+    Chain ID：31337
+    Currency Symbol：ETH
+    (注意将该网络拖动到最高连接优先级)
+    - 导入本地网络中的账户私钥（从Hardhat Network启动时输出的账户中选择一个）
+7. 使用应用
+    - 打开浏览器访问 http://localhost:3000
+    - 连接MetaMask钱包
+    - 领取代币空投
+    - 作为公证人创建彩票项目（注意，合约部署时Hardhat Network报文中"From:"后的地址就是公证人地址，其他地址对应的账户无法创建彩票项目）
+    - 作为玩家购买彩票
+    - 进行彩票交易，卖家通过挂单出售界面售卖持有的彩票，卖家通过点击彩票项目列表下订单簿按钮查看在售彩票并购买
+    - 公布开奖结果（只有公证人可以进行）
+    - 所有涉及代币或彩票的交易都需要在点击按钮后等待一段时间至metamask确认界面弹出，部分操作需要等待两次，等待时间较长，请勿在等待过程中进行其他操作！
 
 ## 功能实现分析
 
 简单描述：项目完成了要求的哪些功能？每个功能具体是如何实现的？
 
 建议分点列出。
-
+1、ERC20代币系统
+功能：实现了一个名为LotteryToken (LTK)的ERC20代币，用于彩票系统的交易媒介
+实现方式：
+- 使用OpenZeppelin的ERC20和Ownable合约构建
+- 提供空投功能，每个用户可以领取1000 LTK初始资金
+- 通过airdrop()函数实现，防止重复领取
+2、ERC721彩票NFT系统
+功能：将彩票实现为NFT，使每张彩票具有唯一性和可交易性
+实现方式：
+- 基于OpenZeppelin的ERC721和ERC721Enumerable合约
+- 每张彩票包含项目ID、选择索引和购买金额等信息
+- 通过mint()函数由彩票合约铸造并分配给购买者
+3、彩票项目创建
+功能：公证人可以创建彩票项目，设定选项和奖金池
+实现方式：
+- 通过createLottery()函数创建项目，需要指定名称、选项、奖金总额和持续时间
+- 公证人需要预先批准并转入奖金到彩票合约
+- 只有合约所有者（公证人）可以创建项目
+4、彩票购买
+功能：玩家可以选择彩票项目中的选项并购买相应金额的彩票
+实现方式：
+- 通过buyTicket()函数实现，需要指定项目ID、选项索引和购买金额
+- 购买时自动将资金分为两部分：10%给项目创建者，90%进入奖池
+- 成功购买后铸造对应的彩票NFT
+5、彩票交易系统
+功能：玩家可以在项目结束前交易持有的彩票
+实现方式：
+- 通过placeOrder()函数挂单出售彩票，指定价格
+- 通过buyOrder()函数购买他人挂单的彩票
+- 实现了链上订单簿，记录所有挂单信息
+6、开奖与奖金分配
+功能：公证人可以结束项目并公布开奖结果，系统自动分配奖金
+实现方式：
+- 通过declareResult()函数公布开奖结果，指定获胜选项
+- 通过_distributePrizes()内部函数按比例分配奖金给获胜者
+- 获胜者可以通过finishLottery()函数结束项目
+7、前端交互界面
+功能：提供完整的Web界面供用户与合约交互
+实现方式：
+- 使用React构建用户界面
+- 集成MetaMask钱包连接
+- 实现了钱包连接、代币空投领取、项目创建、彩票购买、交易、开奖等所有功能的前端界面
+- 实时显示用户持有的彩票、订单簿信息和项目状态
 ## 项目运行截图
 
 放一些项目运行截图。
 
 项目运行成功的关键页面和流程截图。主要包括操作流程以及和区块链交互的截图。
+1、连接MetaMask钱包，领取空投：
+![alt text](image.png)
+2、创建彩票项目：
+![alt text](image-1.png)
+3、购买彩票：
+![alt text](image-2.png)
+![alt text](image-3.png)
+4、交易彩票：
+![alt text](image-4.png)
+![alt text](image-5.png)
+5、开奖：
+![alt text](image-6.png)
+
 
 ## 参考内容
 
